@@ -1,44 +1,43 @@
 import torch.nn as nn
 
-class Generator(nn.Module):
-    def __init__(self, filter_size):
-        super().__init__(Generator)
+class ConvBlock(nn.Module):
+    """Base convolution block with BatchNorm and ReLU"""
+    def __init__(self, in_channels, out_channels, use_batchnorm=True, is_encoder=True):
+        super(ConvBlock, self).__init__()
 
-        self.encoder = nn.Sequential(
-            self.encoder_conv_maker(3, 64),
-            self.encoder_conv_maker(64, 128),
-            self.encoder_conv_maker(128, 256),
-            self.encoder_conv_maker(256, 512),
-            self.encoder_conv_maker(512, 512),
-            self.encoder_conv_maker(512, 512),
-            self.encoder_conv_maker(512, 512),
-            self.encoder_conv_maker(512, 512),
-        )
-
-        self.decoder = nn.Sequential(
-            self.decoder_conv_maker(512, 512, True),
-            self.decoder_conv_maker(512, 512, True),
-            self.decoder_conv_maker(512, 512, True),
-            self.decoder_conv_maker(512, 512),
-            self.decoder_conv_maker(512, 256),
-            self.decoder_conv_maker(256, 128),
-            self.decoder_conv_maker(128, 64),
-        )
-
-    def encoder_conv_maker(self, in_channels, out_channels):
-        conv_layer = nn.Conv2d(in_channels, out_channels, kernel_size=(4,4), stride=2)
-        batch_layer = nn.BatchNorm2d()(conv_layer)
-        relu_layer = nn.ReLU()(batch_layer)
-        return relu_layer
-    
-
-    def decoder_conv_maker(self, in_channels, out_channels, dropout=True):
-        conv_layer = nn.Conv2d(in_channels, out_channels, kernel_size=(4,4), stride=2)
-        batch_layer = nn.BatchNorm2d()(conv_layer)
-        if dropout:
-            dropout_layer = nn.Dropout()(batch_layer)
-            relu_layer = nn.ReLU()(dropout_layer)
+        if is_encoder:
+            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=(4,4), stride=2, padding=1)
         else:
-            relu_layer = nn.ReLU()(batch_layer)
+            self.conv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=(4,4), stride=2, padding=1)
+        
+        layers = [self.conv]
+        
+        if use_batchnorm:
+            layers.append(nn.BatchNorm2d(out_channels))
+        
+        if is_encoder:
+            layers.append(nn.LeakyReLU(negative_slope=0.2, inplace=True))
+        else:
+            layers.append(nn.ReLU(inplace=True))
+        
+        self.model = nn.Sequential(*layers)
 
-        return relu_layer
+    def forward(self, x):
+        return self.model(x)
+
+
+class DropoutConvBlock(nn.Module):
+    """Convolutional block with BatchNrom, Dropout and ReLU for decoder"""
+    def __init__(self, in_channels, out_channels, dropout_rate=0.5):
+        super(DropoutConvBlock, self).__init__()
+        
+        self.model = nn.Sequential(
+            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=(4,4), stride=2, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.Dropout2d(dropout_rate),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        return self.model(x)
+    
