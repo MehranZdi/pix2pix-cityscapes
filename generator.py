@@ -88,9 +88,9 @@ class UNetGenerator(nn.Module):
         d2_out = self.d2(torch.cat([d1_out, e7_out], dim=1))
         d3_out = self.d3(torch.cat([d2_out, e6_out], dim=1))
         d4_out = self.d4(torch.cat([d3_out, e5_out], dim=1))
-        d5_out = self.d5([d4_out, e4_out], dim=1)
-        d6_out = self.d6([d5_out, e3_out], dim=1)
-        d7_out = self.d7([d6_out, e2_out], dim=1)
+        d5_out = self.d5(torch.cat([d4_out, e4_out], dim=1))
+        d6_out = self.d6(torch.cat([d5_out, e3_out], dim=1))
+        d7_out = self.d7(torch.cat([d6_out, e2_out], dim=1))
 
         output = self.output_layer(torch.cat([d7_out, e1_out], dim=1))
         return output
