@@ -46,7 +46,7 @@ class DropoutConvBlock(nn.Module):
 
 class UNetGenerator(nn.Module):
     """U-net generator architecture with skip connections"""
-    def __init__(self, in_channels=3, out_channels=3):
+    def __init__(self, in_channels=1, out_channels=3):
         super(UNetGenerator, self).__init__()
 
         # Encoder layers
@@ -94,3 +94,31 @@ class UNetGenerator(nn.Module):
 
         output = self.output_layer(torch.cat([d7_out, e1_out], dim=1))
         return output
+    
+
+class Discrimator(nn.Module):
+    def __init__(self, in_channels=4):
+        super(Discrimator, self).__init__()
+        
+        self.model = nn.Sequential(
+            nn.Conv2d(in_channels, 64, kernel_size=(4,4), stride=2, padding=1),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(64, 128, kernel_size=(4,4), stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(128, 256, kernel_size=(4,4), stride=2, padding=1),
+            nn.BatchNorm2d(256),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(256, 512, kernel_size=(4,4), stride=2, padding=1),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(512, 1, kernel_size=(4,4), stride=1, padding=1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        return self.model(x)
