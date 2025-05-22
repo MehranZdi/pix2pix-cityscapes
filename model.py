@@ -96,9 +96,9 @@ class UNetGenerator(nn.Module):
         return output
     
 
-class Discrimator(nn.Module):
+class Discriminator(nn.Module):
     def __init__(self, in_channels=4):
-        super(Discrimator, self).__init__()
+        super(Discriminator, self).__init__()
         
         self.model = nn.Sequential(
             nn.Conv2d(in_channels, 64, kernel_size=(4,4), stride=2, padding=1),
