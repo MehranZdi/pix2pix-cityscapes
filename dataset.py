@@ -6,13 +6,8 @@ from torchvision.transforms import transforms
 from torch.utils.data import DataLoader, Dataset
 
 
-dataset = load_dataset("huggan/edges2shoes", split='train')
-train_indices, val_indices = train_test_split(range(len(dataset)), test_size=0.2, random_state=24, shuffle=True)
-train_data = dataset.select(train_indices)
-val_data = dataset.select(val_indices)
-
-
 class EdgesToShoesDataset(Dataset):
+
     def __init__(self, hugf_dataset, transform=None):
         self.dataset = hugf_dataset
         self.transform = transform or transforms.Compose([
@@ -35,9 +30,14 @@ class EdgesToShoesDataset(Dataset):
         return {'input': image_a, 'target': image_b}
 
 
-        
-train_dataset = EdgesToShoesDataset(train_data)
-val_dataset =   EdgesToShoesDataset(val_data)
+if __name__ == "__main__":
+    dataset = load_dataset("huggan/edges2shoes", split='train')
+    train_indices, val_indices = train_test_split(range(len(dataset)), test_size=0.2, random_state=24, shuffle=True)
+    train_data = dataset.select(train_indices)
+    val_data = dataset.select(val_indices)
 
-train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=2)
-val_loader = DataLoader(val_dataset, batch_size=16, num_workers=2)
+    train_dataset = EdgesToShoesDataset(train_data)
+    val_dataset =   EdgesToShoesDataset(val_data)
+
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size=16, num_workers=2)
