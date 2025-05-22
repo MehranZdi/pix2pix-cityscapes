@@ -46,7 +46,7 @@ class DropoutConvBlock(nn.Module):
 
 class UNetGenerator(nn.Module):
     """U-net generator architecture with skip connections"""
-    def __init__(self, in_channels=1, out_channels=3):
+    def __init__(self, in_channels=3, out_channels=3):
         super(UNetGenerator, self).__init__()
 
         # Encoder layers
@@ -97,7 +97,7 @@ class UNetGenerator(nn.Module):
     
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels=4):
+    def __init__(self, in_channels=6):
         super(Discriminator, self).__init__()
         
         self.model = nn.Sequential(
