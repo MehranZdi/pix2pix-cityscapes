@@ -1,15 +1,17 @@
-from datasets import load_dataset
-from sklearn.model_selection import train_test_split
-from io import BytesIO
-from PIL import Image
 from torchvision.transforms import transforms
 from torch.utils.data import DataLoader, Dataset
+from PIL import Image
+import os
 
+class CityscapesDataset(Dataset):
 
-class EdgesToShoesDataset(Dataset):
+    def __init__(self, path, transform=None):
+        self.img_dir = os.path.join(path + '/img')
+        self.label_dir = os.path.join(path + '/label')
 
-    def __init__(self, hugf_dataset, transform=None):
-        self.dataset = hugf_dataset
+        self.img_files = sorted(os.listdir(self.img_dir))
+        self.label_files = sorted(os.listdir(self.label_dir))
+        
         self.transform = transform or transforms.Compose([
             transforms.Resize((256, 256)),
             transforms.ToTensor(),
@@ -17,27 +19,26 @@ class EdgesToShoesDataset(Dataset):
         ])
     
     def __len__(self):
-        return len(self.dataset)
+        return len(self.img_files)
     
 
     def __getitem__(self, idx):
-        image_a = Image.open(BytesIO(self.dataset[idx]['imageA']['bytes'])).convert("RGB")
-        image_b = Image.open(BytesIO(self.dataset[idx]['imageB']['bytes'])).convert("RGB")
-        
-        image_a = self.transform(image_a)
-        image_b = self.transform(image_b)
+        image_path = os.path.join(self.img_dir, self.img_files[idx])
+        label_path = os.path.join(self.label_dir, self.label_files[idx])
 
-        return {'input': image_a, 'target': image_b}
+        image = Image.open(image_path).convert("RGB")
+        label = Image.open(label_path).convert("RGB")
+        image = self.transform(image)
+        label = self.transform(label)
+
+        return {'image': image, 'label': label}
 
 
 if __name__ == "__main__":
-    dataset = load_dataset("huggan/edges2shoes", split='train')
-    train_indices, val_indices = train_test_split(range(len(dataset)), test_size=0.2, random_state=24, shuffle=True)
-    train_data = dataset.select(train_indices)
-    val_data = dataset.select(val_indices)
-
-    train_dataset = EdgesToShoesDataset(train_data)
-    val_dataset =   EdgesToShoesDataset(val_data)
-
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=2)
+    train_path = "/home/mehran/Documents/Pix2Pix/train"
+    val_path = "/home/mehran/Documents/Pix2Pix/val"
+    
+    train_dataset = CityscapesDataset(train_path)
+    val_dataset = CityscapesDataset(val_path)
+    train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=2)
     val_loader = DataLoader(val_dataset, batch_size=16, num_workers=2)
