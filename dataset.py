@@ -4,20 +4,34 @@ from PIL import Image
 import os
 
 class CityscapesDataset(Dataset):
-
-    def __init__(self, path, transform=None):
+    def __init__(self, path, transform=None, is_train=True):
         self.img_dir = os.path.join(path + '/img')
         self.label_dir = os.path.join(path + '/label')
 
         self.img_files = sorted(os.listdir(self.img_dir))
         self.label_files = sorted(os.listdir(self.label_dir))
-        
-        self.transform = transform or transforms.Compose([
+
+        if is_train:
+            self.transform = transforms.Compose([
+                # Randomly choose between jitter (resize + crop) and simple resize
+                transforms.RandomChoice([
+                    transforms.Compose([
+                        transforms.Resize(286),  # Random jitter
+                        transforms.RandomCrop(256),
+                    ]),
+                    transforms.Resize((256, 256)),  # No jitter
+                ], p=[0.8, 0.2]),  # 80% chance of jitter, 20% chance of no jitter
+                transforms.RandomHorizontalFlip(p=0.5),  # Mirroring
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,))
+            ])
+        else:
+            self.transform = transform or transforms.Compose([
             transforms.Resize((256, 256)),
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,))
-        ])
-    
+            ])
+
     def __len__(self):
         return len(self.img_files)
     
