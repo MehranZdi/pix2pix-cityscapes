@@ -4,13 +4,40 @@ import os
 from torch.utils.tensorboard import SummaryWriter
 import torchvision.utils as vutils
 from torch.utils.data import DataLoader
-from torchvision.transforms import transforms
 from dataset import CityscapesDataset
 from model import UNetGenerator, Discriminator
-import torch.optim as optim
 from tqdm import tqdm
 import time
+import torchvision.models as models
 
+# Define Perceptual Loss using VGG16
+class PerceptualLoss(nn.Module):
+    def __init__(self, device):
+        super(PerceptualLoss, self).__init__()
+        vgg = models.vgg16(pretrained=True).features.to(device).eval()
+        for param in vgg.parameters():
+            param.requires_grad = False
+        self.vgg_layers = vgg
+        self.layer_weights = {'3': 1.0, '8': 1.0, '15': 1.0}  # Use early layers for perceptual loss
+
+    def forward(self, x, y):
+        loss = 0.0
+        for i, layer in enumerate(self.vgg_layers):
+            x = layer(x)
+            y = layer(y)
+            if str(i) in self.layer_weights:
+                loss += self.layer_weights[str(i)] * nn.functional.mse_loss(x, y)
+            if i == 15:  # Stop after layer 15
+                break
+        return loss
+
+def load_checkpoint(generator, discriminator, optimizer_G, optimizer_D, path, device):
+    checkpoint = torch.load(path, map_location=device)
+    generator.load_state_dict(checkpoint['generator_state_dict'])
+    discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
+    optimizer_G.load_state_dict(checkpoint['optimizer_G_state_dict'])
+    optimizer_D.load_state_dict(checkpoint['optimizer_D_state_dict'])
+    return checkpoint['epoch'], checkpoint['loss_G'], checkpoint['loss_D']
 
 def train_one_epoch(
         generator,
@@ -20,15 +47,17 @@ def train_one_epoch(
         optimizer_D,
         bce_loss,
         l1_loss,
+        perceptual_loss,
         device,
-        lambda_l1=50,  # lowered
-        epoch=10
+        lambda_l1=50,
+        lambda_perceptual=10,
+        epoch=0
 ):
     generator.train()
     discriminator.train()
 
     loop = tqdm(train_loader, desc="Training", leave=False)
-    total_g_loss, total_d_loss = 0.0, 0.0
+    total_g_loss, total_d_loss, total_perceptual_loss = 0.0, 0.0, 0.0
 
     for batch in loop:
         input_img = batch["input"].to(device)
@@ -37,13 +66,17 @@ def train_one_epoch(
         fake_img = generator(input_img)
 
         ### Train Discriminator
-        if epoch > 30:  # Freeze D for first 5 epochs
+        train_d = True
+        if epoch < 5:
+            train_d = False
+
+        if train_d:
             D_real = discriminator(torch.cat([input_img, target_img], dim=1))
-            real_labels = torch.full_like(D_real, 0.9).to(device)  # label smoothing
+            real_labels = torch.full_like(D_real, 0.9).to(device)
             loss_real = bce_loss(D_real, real_labels)
 
             D_fake = discriminator(torch.cat([input_img, fake_img.detach()], dim=1))
-            fake_labels = torch.zeros_like(D_fake).to(device)
+            fake_labels = torch.full_like(D_fake, 0.1).to(device)
             loss_fake = bce_loss(D_fake, fake_labels)
 
             d_loss = (loss_real + loss_fake) * 0.5
@@ -51,37 +84,34 @@ def train_one_epoch(
             d_loss.backward()
             optimizer_D.step()
         else:
-            d_loss = torch.tensor(0.0)  # D not trained yet
+            d_loss = torch.tensor(0.0, device=device)
 
         ### Train Generator
         D_fake_for_G = discriminator(torch.cat([input_img, fake_img], dim=1))
-        valid_labels = torch.ones_like(D_fake_for_G).to(device)
+        valid_labels = torch.full_like(D_fake_for_G, 0.9).to(device)
         g_adv_loss = bce_loss(D_fake_for_G, valid_labels)
         g_l1_loss = l1_loss(fake_img, target_img) * lambda_l1
-        g_loss = g_adv_loss + g_l1_loss
+        g_perceptual_loss = perceptual_loss(fake_img, target_img) * lambda_perceptual
+        g_loss = g_adv_loss + g_l1_loss + g_perceptual_loss
 
         optimizer_G.zero_grad()
         g_loss.backward()
         optimizer_G.step()
 
-        # Confirm G is updating
-        # for name, param in generator.named_parameters():
-        #     if param.grad is not None:
-        #         print(f"{name} grad mean: {param.grad.abs().mean().item()}")
-        #         break
-
         total_g_loss += g_loss.item()
         total_d_loss += d_loss.item()
+        total_perceptual_loss += g_perceptual_loss.item()
 
         loop.set_postfix({
             "G_loss": f"{g_loss.item():.4f}",
-            "D_loss": f"{d_loss.item():.4f}"
+            "D_loss": f"{d_loss.item():.4f}",
+            "Perceptual_loss": f"{g_perceptual_loss.item():.4f}"
         })
 
     avg_g_loss = total_g_loss / len(train_loader)
     avg_d_loss = total_d_loss / len(train_loader)
-    return avg_g_loss, avg_d_loss
-
+    avg_perceptual_loss = total_perceptual_loss / len(train_loader)
+    return avg_g_loss, avg_d_loss, avg_perceptual_loss
 
 def validate(generator, val_loader, l1_loss, device):
     val_l1_total = 0.0
@@ -101,7 +131,6 @@ def validate(generator, val_loader, l1_loss, device):
 
         return val_l1_total / len(val_loader)
 
-
 def train_model(
         generator,
         discriminator,
@@ -111,27 +140,39 @@ def train_model(
         optimizer_D,
         device,
         num_epochs=200,
-        lambda_l1=50,
+        lambda_l1=30,
+        lambda_perceptual=10,
         checkpoint_dir="checkpoints"
 ):
     writer = SummaryWriter(log_dir="runs/pix2pix_experiment")
 
     bce_loss = nn.BCEWithLogitsLoss()
     l1_loss = nn.L1Loss()
+    perceptual_loss = PerceptualLoss(device)
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    scheduler_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=lambda epoch: 1.0 if epoch < 100 else 1 - (
-                epoch - 100) / 100)
-    scheduler_D = torch.optim.lr_scheduler.LambdaLR(optimizer_D, lr_lambda=lambda epoch: 1.0 if epoch < 100 else 1 - (
-                epoch - 100) / 100)
-
+    start_epoch = 0
     best_val_l1 = float('inf')
     patience = 80
     counter = 0
 
-    for epoch in range(num_epochs):
+    # === Optionally Resume from Checkpoint ===
+    resume_path = os.path.join(checkpoint_dir, "checkpoint_epoch_135.pth")
+    if os.path.exists(resume_path):
+        print("Loading checkpoint...")
+        start_epoch, _, _ = load_checkpoint(
+            generator, discriminator, optimizer_G, optimizer_D,
+            resume_path, device
+        )
+        for param_group in optimizer_G.param_groups:
+            param_group['lr'] *= 0.5
+        for param_group in optimizer_D.param_groups:
+            param_group['lr'] *= 0.5
+        print(f"Resuming from epoch {start_epoch + 1}")
+
+    for epoch in range(start_epoch + 1, num_epochs):
         print(f"\nEpoch {epoch + 1} / {num_epochs}")
-        avg_g_loss, avg_d_loss = train_one_epoch(
+        avg_g_loss, avg_d_loss, avg_perceptual_loss = train_one_epoch(
             generator,
             discriminator,
             train_loader,
@@ -139,17 +180,21 @@ def train_model(
             optimizer_D,
             bce_loss,
             l1_loss,
+            perceptual_loss,
             device,
             lambda_l1,
-            epoch  # ← pass current epoch
+            lambda_perceptual,
+            epoch
         )
 
         val_l1 = validate(generator, val_loader, l1_loss, device)
 
         writer.add_scalar("Loss/Generator", avg_g_loss, epoch)
         writer.add_scalar("Loss/Discriminator", avg_d_loss, epoch)
+        writer.add_scalar("Loss/Perceptual", avg_perceptual_loss, epoch)
         writer.add_scalar("Loss/Val_L1", val_l1, epoch)
 
+        # Save preview image
         if epoch % 5 == 0:
             with torch.no_grad():
                 batch = next(iter(val_loader))
@@ -158,10 +203,11 @@ def train_model(
                 grid = vutils.make_grid(fake_img, normalize=True)
                 writer.add_image("Generated Images", grid, epoch)
 
-        # if epoch % 10 == 0:
-        #     vutils.save_image(fake_img * 0.5 + 0.5, f"results/fake_epoch_{epoch}.png")
+        if epoch % 10 == 0:
+            vutils.save_image(fake_img * 0.5 + 0.5, f"results/fake_epoch_{epoch}.png")
 
-        print(f"Epoch {epoch + 1} Summary: G_loss={avg_g_loss:.4f} | D_loss={avg_d_loss:.4f} | Val_L1={val_l1:.4f}")
+        print(f"Epoch {epoch + 1} Summary: G_loss={avg_g_loss:.4f} | D_loss={avg_d_loss:.4f} | Perceptual_loss={avg_perceptual_loss:.4f} | Val_L1={val_l1:.4f}")
+
         torch.save({
             'epoch': epoch,
             'generator_state_dict': generator.state_dict(),
@@ -170,22 +216,21 @@ def train_model(
             'optimizer_D_state_dict': optimizer_D.state_dict(),
             'loss_G': avg_g_loss,
             'loss_D': avg_d_loss,
-        }, f'{checkpoint_dir}/checkpoint_epoch_{epoch + 1}.pth')
+        }, os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch + 1}.pth"))
 
-        scheduler_G.step()
-        scheduler_D.step()
-
+        # Optionally save best model
         if val_l1 < best_val_l1:
             best_val_l1 = val_l1
             counter = 0
+            torch.save(generator.state_dict(), os.path.join(checkpoint_dir, "best_generator.pth"))
         else:
             counter += 1
+
         if counter >= patience:
             print("Early stopping triggered")
             break
 
     writer.close()
-
 
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -196,15 +241,17 @@ if __name__ == '__main__':
 
     train_dataset = CityscapesDataset(train_path, is_train=True)
     val_dataset = CityscapesDataset(val_path, is_train=False)
-    train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True, num_workers=2)
-    val_loader = DataLoader(val_dataset, batch_size=4, num_workers=2)
+
+    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size=8, num_workers=2)
 
     generator = UNetGenerator().to(device)
     discriminator = Discriminator().to(device)
 
-    optimizer_G = torch.optim.Adam(generator.parameters(), lr=2e-4, betas=(0.5, 0.999))
-    optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=1e-4, betas=(0.5, 0.999))  # Reduced D learning rate
+    optimizer_G = torch.optim.Adam(generator.parameters(), lr=3e-4, betas=(0.5, 0.999))
+    optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=1e-5, betas=(0.5, 0.999))
+
     start_time = time.time()
-    train_model(generator, discriminator, train_loader, val_loader, optimizer_G, optimizer_D, device, num_epochs=200)
+    train_model(generator, discriminator, train_loader, val_loader, optimizer_G, optimizer_D, device)
     end_time = time.time()
-    print(f'Training took {(end_time - start_time):.4f}')
+    print(f'Training took {(end_time - start_time):.2f} seconds')
