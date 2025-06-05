@@ -1,66 +1,77 @@
-from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
-from PIL import Image
 import os
-import random
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
+import torchvision.transforms as transforms
+
 
 class CityscapesDataset(Dataset):
-    def __init__(self, path, is_train=True):
-        self.img_dir = os.path.join(path, 'img')
-        self.label_dir = os.path.join(path, 'label')
+    def __init__(self, path, is_train=True, target_size=(512, 256)):
+        self.img_dir = os.path.join(path, 'images')
+        self.label_dir = os.path.join(path, 'masks')
 
-        self.img_files = sorted(os.listdir(self.img_dir))
-        self.label_files = sorted(os.listdir(self.label_dir))
+        # Get all image and label files
+        self.img_files = sorted([f for f in os.listdir(self.img_dir) if f.endswith('_leftImg8bit.png')])
+        self.label_files = sorted([f for f in os.listdir(self.label_dir) if f.endswith('_gtFine_color.png')])
 
-        assert len(self.img_files) == len(self.label_files), "Image and label count mismatch!"
+        # Pair images and labels by common prefix
+        self.pairs = []
+        img_prefixes = {f.split('_leftImg8bit')[0]: f for f in self.img_files}
+        label_prefixes = {f.split('_gtFine_color')[0]: f for f in self.label_files}
+
+        for prefix in img_prefixes:
+            if prefix in label_prefixes:
+                self.pairs.append((img_prefixes[prefix], label_prefixes[prefix]))
+
+        assert len(self.pairs) > 0, "No matching image-label pairs found!"
 
         self.is_train = is_train
-        self.resize = transforms.Resize((286, 286))
-        self.crop = transforms.RandomCrop((256, 256))
-        self.flip = transforms.RandomHorizontalFlip(p=1.0)
-        self.to_tensor = transforms.ToTensor()
-        self.normalize = transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+        self.target_size = target_size
+
+        # Define transformations
+        if self.is_train:
+            self.transform = transforms.Compose([
+                transforms.Resize(target_size),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.ToTensor(),  # Convert to [C, H, W] and scale [0, 255] to [0, 1]
+                transforms.Lambda(lambda x: x * 2.0 - 1.0),  # Scale to [-1, 1]
+            ])
+        else:
+            self.transform = transforms.Compose([
+                transforms.Resize(target_size),
+                transforms.ToTensor(),  # Convert to [C, H, W] and scale [0, 255] to [0, 1]
+                transforms.Lambda(lambda x: x * 2.0 - 1.0),  # Scale to [-1, 1]
+            ])
 
     def __len__(self):
-        return len(self.img_files)
+        return len(self.pairs)
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, self.img_files[idx])
-        label_path = os.path.join(self.label_dir, self.label_files[idx])
+        img_filename, label_filename = self.pairs[idx]
+        img_path = os.path.join(self.img_dir, img_filename)
+        label_path = os.path.join(self.label_dir, label_filename)
 
         img = Image.open(img_path).convert("RGB")
         label = Image.open(label_path).convert("RGB")
 
-        if self.is_train:
-            # Apply same random operations to both input & label
-            img, label = self.resize(img), self.resize(label)
+        # Apply transformations to both image and label
+        img_tensor = self.transform(img)
+        label_tensor = self.transform(label)
 
-            i, j, h, w = transforms.RandomCrop.get_params(img, output_size=(256, 256))
-            img = transforms.functional.crop(img, i, j, h, w)
-            label = transforms.functional.crop(label, i, j, h, w)
+        # Debug: Check tensor types, shapes, and ranges
+        if idx == 0:  # Print for the first item in each epoch
+            print(
+                f"Input (label) dtype: {label_tensor.dtype}, shape: {label_tensor.shape}, min: {label_tensor.min()}, max: {label_tensor.max()}")
+            print(
+                f"Target (image) dtype: {img_tensor.dtype}, shape: {img_tensor.shape}, min: {img_tensor.min()}, max: {img_tensor.max()}")
 
-            if random.random() > 0.5:
-                img = transforms.functional.hflip(img)
-                label = transforms.functional.hflip(label)
-
-        else:
-            img = transforms.Resize((256, 256))(img)
-            label = transforms.Resize((256, 256))(label)
-
-        img = self.to_tensor(img)
-        label = self.to_tensor(label)
-
-        img = self.normalize(img)
-        label = self.normalize(label)
-
-        return {"input": label, "target": img}  # ← Pix2Pix: label → photo
+        return {"input": label_tensor, "target": img_tensor}  # label → photo
 
 
 if __name__ == "__main__":
-    train_path = "/home/mehran/Datasets/Pix2Pix/Cityscapes/train"
-    val_path = "/home/mehran/Datasets/Pix2Pix/Cityscapes/train"
+    train_path = "/home/mehran/Datasets/Cityscapes/train"
+    val_path = "/home/mehran/Datasets/Cityscapes/val"
 
-    train_dataset = CityscapesDataset(train_path)
-    val_dataset = CityscapesDataset(val_path)
-    train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=3)
-    val_loader = DataLoader(val_dataset, batch_size=16, num_workers=2)
+    train_dataset = CityscapesDataset(train_path, is_train=True, target_size=(512, 256))
+    val_dataset = CityscapesDataset(val_path, is_train=False, target_size=(512, 256))
+    train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size=2, num_workers=2)
