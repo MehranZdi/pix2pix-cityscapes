@@ -53,17 +53,8 @@ class CityscapesDataset(Dataset):
         img = Image.open(img_path).convert("RGB")
         label = Image.open(label_path).convert("RGB")
 
-        # Apply transformations to both image and label
         img_tensor = self.transform(img)
         label_tensor = self.transform(label)
-
-        # Debug: Check tensor types, shapes, and ranges
-        if idx == 0:  # Print for the first item in each epoch
-            print(
-                f"Input (label) dtype: {label_tensor.dtype}, shape: {label_tensor.shape}, min: {label_tensor.min()}, max: {label_tensor.max()}")
-            print(
-                f"Target (image) dtype: {img_tensor.dtype}, shape: {img_tensor.shape}, min: {img_tensor.min()}, max: {img_tensor.max()}")
-
         return {"input": label_tensor, "target": img_tensor}  # label → photo
 
 
