@@ -1,0 +1,18 @@
+paths:
+  train: /home/mehran/Datasets/Cityscapes/train
+  val: /home/mehran/Datasets/Cityscapes/val
+  checkpoints: checkpoints
+  results: results
+
+training:
+  batch_size: 8
+  epochs: 400
+  lambda_l1: 50
+  resume_epochs: 1
+  patience: 80
+  log_dir: runs/pix2pix_experiment
+
+optim:
+  lr_g: 0.0003
+  lr_d: 0.0002
+  betas: [0.5, 0.999]
