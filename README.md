@@ -130,8 +130,6 @@ docker pull mehranzdi/pix2pix-cityscapes
 
 ## 🧑‍💻 Author
 
-Made with ❤️ by \[Your Name]
-
 * GitHub: [MehranZdi](https://github.com/MehranZdi)
 ---
 
