@@ -118,6 +118,13 @@ Launch TensorBoard:
 ```bash
 tensorboard --logdir runs/
 ```
+## Docker Image
+
+You can also use the docker image available on Dockerhub
+
+```
+docker pull mehranzdi/pix2pix-cityscapes
+```
 
 ---
 
