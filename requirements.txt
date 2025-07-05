@@ -1,0 +1,6 @@
+torch
+torchvision
+Pillow
+tqdm
+PyYAML
+tensorboard
