@@ -31,9 +31,7 @@ pix2pix_project/
 ---
 
 ## 🧪 Example Results
-
-Epoch 1:
-![output of epoch 1](https://github.com/MehranZdi/pix2pix-cityscapes/blob/main/results/comparison_epoch_0.png)
+#### Output of the last epoch
 ![output of epoch 400](https://github.com/MehranZdi/pix2pix-cityscapes/blob/main/results/comparison_epoch_400.png)
 More samples are saved every 5 epochs to the `results/` folder.
 
