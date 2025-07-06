@@ -50,6 +50,7 @@ pip install -r requirements.txt
 ### 3. Prepare Dataset
 #### Available on Kaggle:
 [Cityscape](https://www.kaggle.com/datasets/mehranzeidi/cityscape-high-resolution)
+
 Make sure your Cityscapes dataset is structured as:
 
 ```
