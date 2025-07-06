@@ -23,9 +23,7 @@ pix2pix_project/
 ├── models/               # Generator, Discriminator, Blocks
 ├── training/             # Trainer, utils
 ├── scripts/              # Training entry point
-├── checkpoints/          # The best checkpoint
 ├── results/              # Generated sample images
-├── runs/                 # TensorBoard logs
 ├── requirements.txt
 └── README.md
 ```
@@ -34,10 +32,9 @@ pix2pix_project/
 
 ## 🧪 Example Results
 
-| Input (Label)                 | Generated                    | Target (Photo)               |
-| ----------------------------- | ---------------------------- | ---------------------------- |
-| ![](results/sample_input.png) | ![](results/sample_fake.png) | ![](results/sample_real.png) |
-
+Epoch 1:
+[output of epoch 1](https://github.com/MehranZdi/pix2pix-cityscapes/blob/main/results/comparison_epoch_0.png)
+[output of epoch 400](https://github.com/MehranZdi/pix2pix-cityscapes/blob/main/results/comparison_epoch_400.png)
 More samples are saved every 5 epochs to the `results/` folder.
 
 ---
@@ -53,7 +50,8 @@ pip install -r requirements.txt
 ```
 
 ### 3. Prepare Dataset
-
+#### Available on Kaggle:
+[Cityscape](https://www.kaggle.com/datasets/mehranzeidi/cityscape-high-resolution)
 Make sure your Cityscapes dataset is structured as:
 
 ```
@@ -74,6 +72,9 @@ Each image should follow the naming:
 Update the paths in `configs/default.yaml` accordingly.
 
 ### 4. Start Training
+
+#### You can download the best generator from google drive:
+[The best checkpoint](https://drive.google.com/drive/folders/1JATGvtL6GPy8G_59-BS5Noa5GI65ZGq9?usp=sharing)
 
 ```bash
 python scripts/train.py
@@ -128,11 +129,17 @@ docker pull mehranzdi/pix2pix-cityscapes
 
 ---
 
-## 🧑‍💻 Author
+## Contributing
 
+Feel free to fork this repository and submit pull requests!
+
+---
+
+## 🧑‍💻 Author
+#### Mehran Zeidi
 * GitHub: [MehranZdi](https://github.com/MehranZdi)
 ---
 
 ## 📄 License
 
-MIT License.
+This project is licensed under the [MIT](https://opensource.org/license/mit) License.
