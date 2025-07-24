@@ -1,4 +1,4 @@
-from blocks import ConvBlock, DropoutConvBlock, SelfAttention
+from models.blocks import ConvBlock, DropoutConvBlock, SelfAttention
 import torch.nn as nn
 import torch
 
@@ -13,9 +13,12 @@ class UNetGenerator(nn.Module):
         super(UNetGenerator, self).__init__()
 
         # Encoder layers
-        self.e1 = ConvBlock(in_channels, 64, use_batchnorm=False)  # 512x256 -> 256x128
-        self.e2 = ConvBlock(64, 128)  # 256x128 -> 128x64
-        self.e3 = ConvBlock(128, 256)  # 128x64 -> 64x32
+        self.e1_same = ConvBlock(in_channels, 64, use_batchnorm=False, kernel_size=3, stride=1, padding=1)  # 512x256 -> 256x128
+        self.e1 = ConvBlock(64, 64, use_batchnorm=False)
+        self.e2_same = ConvBlock(64, 128, kernel_size=3, stride=1, padding=1)  # 256x128 -> 128x64
+        self.e2 = ConvBlock(128, 128)  # 256x128 -> 128x64
+        self.e3_same = ConvBlock(128, 256, kernel_size=3, stride=1, padding=1)  # 128x64 -> 64x32
+        self.e3 = ConvBlock(256, 256)
         self.e4 = ConvBlock(256, 512)  # 64x32 -> 32x16
         self.e5 = ConvBlock(512, 512)  # 32x16 -> 16x8
         self.e6 = ConvBlock(512, 512)  # 16x8 -> 8x4
@@ -42,9 +45,12 @@ class UNetGenerator(nn.Module):
 
     def forward(self, x):
         # Encoder
-        e1_out = self.e1(x)
-        e2_out = self.e2(e1_out)
-        e3_out = self.e3(e2_out)
+        e1_out = self.e1_same(x)
+        e1_out = self.e1(e1_out)
+        e2_out = self.e2_same(e1_out)
+        e2_out = self.e2(e2_out)
+        e3_out = self.e3_same(e2_out)
+        e3_out = self.e3(e3_out)
         e4_out = self.e4(e3_out)
         e5_out = self.e5(e4_out)
         e5_out = self.attn_e5(e5_out)
