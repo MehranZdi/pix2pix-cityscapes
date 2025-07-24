@@ -26,7 +26,7 @@ class UNetGenerator(nn.Module):
         self.e8 = ConvBlock(512, 512)  # 2x4 -> 1x2
 
         # Attention layers - only in bottleneck
-        self.attn_e5 = SelfAttention(512)  # At 16x8 resolution
+        self.attn_e5 = SelfAttention(512)  # At 8x16 resolution
 
         # Decoder layers
         self.d1 = DropoutConvBlock(512, 512)  # 2x1 -> 4x2
