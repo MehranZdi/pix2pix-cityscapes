@@ -34,10 +34,7 @@ pix2pix_project/
 
 ## 🧪 Example Results
 
-| Input (Label)                 | Generated                    | Target (Photo)               |
-| ----------------------------- | ---------------------------- | ---------------------------- |
-| ![](results/sample_input.png) | ![](results/sample_fake.png) | ![](results/sample_real.png) |
-
+![](https://github.com/MehranZdi/pix2pix-cityscapes/blob/main/results/comparison_epoch_385.png)
 More samples are saved every 5 epochs to the `results/` folder.
 
 ---
