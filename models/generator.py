@@ -13,17 +13,17 @@ class UNetGenerator(nn.Module):
         super(UNetGenerator, self).__init__()
 
         # Encoder layers
-        self.e1_same = ConvBlock(in_channels, 64, use_batchnorm=False, kernel_size=3, stride=1, padding=1)  # 512x256 -> 256x128
-        self.e1 = ConvBlock(64, 64, use_batchnorm=False)
-        self.e2_same = ConvBlock(64, 128, kernel_size=3, stride=1, padding=1)  # 256x128 -> 128x64
-        self.e2 = ConvBlock(128, 128)  # 256x128 -> 128x64
-        self.e3_same = ConvBlock(128, 256, kernel_size=3, stride=1, padding=1)  # 128x64 -> 64x32
-        self.e3 = ConvBlock(256, 256)
-        self.e4 = ConvBlock(256, 512)  # 64x32 -> 32x16
-        self.e5 = ConvBlock(512, 512)  # 32x16 -> 16x8
-        self.e6 = ConvBlock(512, 512)  # 16x8 -> 8x4
-        self.e7 = ConvBlock(512, 512)  # 8x4 -> 4x2
-        self.e8 = ConvBlock(512, 512)  # 4x2 -> 2x1
+        self.e1_same = ConvBlock(in_channels, 64, use_batchnorm=False, kernel_size=3, stride=1, padding=1)  # 256x512 -> 256x512
+        self.e1 = ConvBlock(64, 64, use_batchnorm=False) # 256x512 -> 128x256
+        self.e2_same = ConvBlock(64, 128, kernel_size=3, stride=1, padding=1)  # 128x256 -> 128x256
+        self.e2 = ConvBlock(128, 128)  # 128x256 -> 64x128
+        self.e3_same = ConvBlock(128, 256, kernel_size=3, stride=1, padding=1)  # 64x128 -> 64x128
+        self.e3 = ConvBlock(256, 256)  # 64x128 -> 32x64
+        self.e4 = ConvBlock(256, 512)  # 32x64 -> 16x32
+        self.e5 = ConvBlock(512, 512)  # 16x32 -> 8x16
+        self.e6 = ConvBlock(512, 512)  # 8x16 -> 4x8
+        self.e7 = ConvBlock(512, 512)  # 4x8 -> 2x4
+        self.e8 = ConvBlock(512, 512)  # 2x4 -> 1x2
 
         # Attention layers - only in bottleneck
         self.attn_e5 = SelfAttention(512)  # At 16x8 resolution
